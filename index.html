@@ -245,171 +245,251 @@
 
   <script>
     const mCanvas = document.getElementById('main-canvas');
-    const mCtx = mCanvas.getContext('2d');
-    const gCanvas = document.getElementById('mission-canvas');
-    const gCtx = gCanvas.getContext('2d');
-    const video = document.getElementById('video');
-    const statusTxt = document.getElementById('status-txt');
+const mCtx = mCanvas.getContext('2d');
+const gCanvas = document.getElementById('mission-canvas');
+const gCtx = gCanvas.getContext('2d');
+const video = document.getElementById('video');
+const statusTxt = document.getElementById('status-txt');
 
-    let points = [];
-    let missionPattern = [];
-    let userPattern = [];
-    const threshold = 45;
+// --- UI 요소 선택기 ---
+const levelTxt = document.querySelector('.header-level');
+const progressDots = document.querySelectorAll('.p-dot');
 
-    let submitTimer = null; 
-    let isFailed = false; 
+let currentLevel = 1; // 현재 레벨 (1~3)
+let gridSizeN = 2;    // N x N 그리드 사이즈 (초기 2x2)
+let points = [];
+let missionPattern = [];
+let userPattern = [];
+let threshold = 45;   // 터치 인식 반경 (동적 할당)
 
-    function init() {
-      mCanvas.width = mCanvas.clientWidth;
-      mCanvas.height = mCanvas.clientHeight;
-      points = [];
-      const gridSize = mCanvas.width * 0.65;
-      const startX = (mCanvas.width - gridSize) / 2;
-      const startY = (mCanvas.height - gridSize) / 2;
-      const step = gridSize / 2;
+let submitTimer = null; 
+let isFailed = false; 
 
-      for(let i=0; i<3; i++) {
-        for(let j=0; j<3; j++) {
-          points.push({ x: startX + j * step, y: startY + i * step });
-        }
-      }
-      generateMission();
+function init() {
+  mCanvas.width = mCanvas.clientWidth;
+  mCanvas.height = mCanvas.clientHeight;
+  updateLevelUI();
+  setupGrid();
+  generateMission();
+}
+
+// 레벨에 맞춰 UI 텍스트와 프로그레스 바 점(Dot) 업데이트
+function updateLevelUI() {
+  levelTxt.innerText = "Level " + currentLevel;
+  progressDots.forEach((dot, index) => {
+    if (index < currentLevel) dot.classList.add('active');
+    else dot.classList.remove('active');
+  });
+}
+
+// 레벨에 맞춰 N x N 점선 배열 및 인식 범위 셋팅
+function setupGrid() {
+  points = [];
+  if (currentLevel === 1) gridSizeN = 2;
+  else if (currentLevel === 2) gridSizeN = 3;
+  else if (currentLevel === 3) gridSizeN = 4;
+
+  const gridSize = mCanvas.width * 0.65;
+  const startX = (mCanvas.width - gridSize) / 2;
+  const startY = (mCanvas.height - gridSize) / 2;
+  const step = gridSize / (gridSizeN - 1);
+
+  // 점이 촘촘해지면 터치 인식 반경도 줄여서 오터치 방지
+  threshold = Math.min(45, step * 0.4); 
+
+  for(let i=0; i<gridSizeN; i++) {
+    for(let j=0; j<gridSizeN; j++) {
+      points.push({ x: startX + j * step, y: startY + i * step });
     }
+  }
+}
 
-    function generateMission() {
-      const length = Math.floor(Math.random() * 6) + 4; 
-      const indices = [0,1,2,3,4,5,6,7,8];
-      missionPattern = indices.sort(() => Math.random() - 0.5).slice(0, length);
-      userPattern = [];
-      drawMission();
-    }
+// 레벨에 따른 난이도로 미션 생성
+function generateMission() {
+  const totalDots = gridSizeN * gridSizeN;
+  let minLen, maxLen;
+  
+  // 레벨별로 연결해야 하는 최소~최대 선 길이 지정
+  if (currentLevel === 1) { minLen = 3; maxLen = 4; }
+  else if (currentLevel === 2) { minLen = 4; maxLen = 6; }
+  else { minLen = 5; maxLen = 8; }
+  
+  const length = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen; 
+  const indices = Array.from({length: totalDots}, (_, k) => k); // 0 부터 totalDots-1 까지 배열 생성
+  missionPattern = indices.sort(() => Math.random() - 0.5).slice(0, length);
+  userPattern = [];
+  drawMission();
+}
 
-    function drawMission() {
-      gCtx.clearRect(0,0,70,70);
-      gCtx.beginPath(); 
-      gCtx.strokeStyle = "#ffffff"; 
-      gCtx.lineWidth = 3; // 선을 조금 더 잘 보이게 두께 수정
-      gCtx.lineJoin = "round";
-      gCtx.lineCap = "round";
-      
-      missionPattern.forEach((idx, i) => {
-        const x = (idx % 3) * 20 + 15;
-        const y = Math.floor(idx / 3) * 20 + 15;
-        
-        // ★ 수정됨: 점(Circle) 그리는 로직 삭제. 오직 선(Line)만 그림!
-        if(i === 0) gCtx.moveTo(x, y); 
-        else gCtx.lineTo(x, y);
-      });
-      gCtx.stroke();
-    }
+function drawMission() {
+  gCtx.clearRect(0,0,70,70);
+  gCtx.beginPath(); 
+  gCtx.strokeStyle = "#ffffff"; 
+  gCtx.lineWidth = 3; 
+  gCtx.lineJoin = "round";
+  gCtx.lineCap = "round";
+  
+  // 70x70 캔버스 내에서 패딩 15씩 제외한 40의 공간을 N등분
+  const step = 40 / (gridSizeN - 1); 
 
-    const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
-    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+  missionPattern.forEach((idx, i) => {
+    const col = idx % gridSizeN;
+    const row = Math.floor(idx / gridSizeN);
+    const x = col * step + 15;
+    const y = row * step + 15;
+    
+    if(i === 0) gCtx.moveTo(x, y); 
+    else gCtx.lineTo(x, y);
+  });
+  gCtx.stroke();
+}
 
-    hands.onResults((results) => {
-      if (!results.image) return;
-      const vW = results.image.width; const vH = results.image.height;
-      const cW = mCanvas.width; const cH = mCanvas.height;
-      const vRatio = vW / vH; const cRatio = cW / cH;
-      let sW, sH, sx, sy;
-      if (vRatio > cRatio) { sH = vH; sW = vH * cRatio; sx = (vW - sW) / 2; sy = 0; }
-      else { sW = vW; sH = vW / cRatio; sx = 0; sy = (vH - sH) / 2; }
-      
-      mCtx.save();
-      mCtx.clearRect(0, 0, cW, cH);
-      mCtx.translate(cW, 0); mCtx.scale(-1, 1);
-      mCtx.drawImage(results.image, sx, sy, sW, sH, 0, 0, cW, cH);
+const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
 
-      // 3x3 점 시각화 (오답이면 빨간색, 아니면 초록색)
+hands.onResults((results) => {
+  if (!results.image) return;
+  const vW = results.image.width; const vH = results.image.height;
+  const cW = mCanvas.width; const cH = mCanvas.height;
+  const vRatio = vW / vH; const cRatio = cW / cH;
+  let sW, sH, sx, sy;
+  if (vRatio > cRatio) { sH = vH; sW = vH * cRatio; sx = (vW - sW) / 2; sy = 0; }
+  else { sW = vW; sH = vW / cRatio; sx = 0; sy = (vH - sH) / 2; }
+  
+  mCtx.save();
+  mCtx.clearRect(0, 0, cW, cH);
+  mCtx.translate(cW, 0); mCtx.scale(-1, 1);
+  mCtx.drawImage(results.image, sx, sy, sW, sH, 0, 0, cW, cH);
+
+  // N x N 점 시각화
+  points.forEach((p, i) => {
+    const visited = userPattern.includes(i);
+    mCtx.beginPath(); mCtx.arc(p.x, p.y, visited ? 12 : 8, 0, Math.PI*2);
+    mCtx.fillStyle = visited ? (isFailed ? "#f00" : "#0f0") : "rgba(255,255,255,0.25)";
+    mCtx.fill();
+  });
+
+  if (currentLevel > 3) {
+    mCtx.restore();
+    return; // 모든 스테이지 클리어 시 그리기 중단
+  }
+
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    const landmarks = results.multiHandLandmarks[0];
+    const tip = landmarks[8]; // 검지 끝
+    const realX = ((tip.x * vW) - sx) * (cW / sW);
+    const realY = ((tip.y * vH) - sy) * (cH / sH);
+
+    // 오답(FAIL) 상태가 아닐 때만 패턴 입력받기
+    if (!isFailed) {
+      let touchedNewDot = false;
       points.forEach((p, i) => {
-        const visited = userPattern.includes(i);
-        mCtx.beginPath(); mCtx.arc(p.x, p.y, visited ? 12 : 8, 0, Math.PI*2);
-        mCtx.fillStyle = visited ? (isFailed ? "#f00" : "#0f0") : "rgba(255,255,255,0.25)";
-        mCtx.fill();
+        const d = Math.hypot(p.x - realX, p.y - realY);
+        if (d < threshold && !userPattern.includes(i)) {
+          userPattern.push(i);
+          touchedNewDot = true;
+        }
       });
 
-      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        const landmarks = results.multiHandLandmarks[0];
-        const tip = landmarks[8]; // 검지 끝
-        const realX = ((tip.x * vW) - sx) * (cW / sW);
-        const realY = ((tip.y * vH) - sy) * (cH / sH);
-
-        // 오답(FAIL) 상태가 아닐 때만 패턴 입력받기
-        if (!isFailed) {
-          let touchedNewDot = false;
-          points.forEach((p, i) => {
-            const d = Math.hypot(p.x - realX, p.y - realY);
-            if (d < threshold && !userPattern.includes(i)) {
-              userPattern.push(i);
-              touchedNewDot = true;
-            }
-          });
-
-          if (touchedNewDot) {
-            statusTxt.innerText = "DRAWING... (WAIT 3S)";
-            statusTxt.style.color = "#0f0";
-
-            if (submitTimer) clearTimeout(submitTimer);
-            submitTimer = setTimeout(() => {
-              checkAnswer();
-            }, 3000);
-          }
-        }
-
-        // 패턴 선 그리기
-        if (userPattern.length > 0) {
-          mCtx.beginPath(); 
-          mCtx.strokeStyle = isFailed ? "#f00" : "#0f0"; 
-          mCtx.lineWidth = 4;
-          mCtx.lineJoin = "round"; mCtx.lineCap = "round";
-          
-          mCtx.moveTo(points[userPattern[0]].x, points[userPattern[0]].y);
-          userPattern.forEach(idx => mCtx.lineTo(points[idx].x, points[idx].y));
-          
-          if (!isFailed) mCtx.lineTo(realX, realY); 
-          mCtx.stroke();
-        }
-
-        // 손가락 마커
-        mCtx.beginPath();
-        mCtx.arc(realX, realY, 8, 0, Math.PI * 2);
-        mCtx.fillStyle = "#fff"; 
-        mCtx.fill();
-        mCtx.lineWidth = 3;
-        mCtx.strokeStyle = isFailed ? "#f00" : "#0f0"; 
-        mCtx.stroke();
-      }
-      mCtx.restore();
-    });
-
-    function checkAnswer() {
-      const isCorrect = userPattern.length === missionPattern.length && 
-                        userPattern.every((v, idx) => v === missionPattern[idx]);
-      
-      if (isCorrect) {
-        statusTxt.innerText = "SUCCESS!!";
+      if (touchedNewDot) {
+        statusTxt.innerText = "DRAWING... (WAIT 3S)";
         statusTxt.style.color = "#0f0";
-        setTimeout(() => {
-          userPattern = [];
-          generateMission(); 
-        }, 1000);
-      } else {
-        isFailed = true; 
-        statusTxt.innerText = "FAIL! WRONG SEQUENCE";
-        statusTxt.style.color = "red";
-        
-        setTimeout(() => { 
-          userPattern = []; 
-          isFailed = false; 
-          statusTxt.innerText = "READY"; 
-          statusTxt.style.color = "#0f0"; 
-          generateMission(); 
-        }, 1500);
+
+        if (submitTimer) clearTimeout(submitTimer);
+        submitTimer = setTimeout(() => {
+          checkAnswer();
+        }, 3000);
       }
     }
 
-    const camera = new Camera(video, { onFrame: async () => { await hands.send({ image: video }); }, width: 640, height: 480 });
-    camera.start().then(init);
+    // 패턴 선 그리기
+    if (userPattern.length > 0) {
+      mCtx.beginPath(); 
+      mCtx.strokeStyle = isFailed ? "#f00" : "#0f0"; 
+      mCtx.lineWidth = 4;
+      mCtx.lineJoin = "round"; mCtx.lineCap = "round";
+      
+      mCtx.moveTo(points[userPattern[0]].x, points[userPattern[0]].y);
+      userPattern.forEach(idx => mCtx.lineTo(points[idx].x, points[idx].y));
+      
+      if (!isFailed) mCtx.lineTo(realX, realY); 
+      mCtx.stroke();
+    }
+
+    // 손가락 마커
+    mCtx.beginPath();
+    mCtx.arc(realX, realY, 8, 0, Math.PI * 2);
+    mCtx.fillStyle = "#fff"; 
+    mCtx.fill();
+    mCtx.lineWidth = 3;
+    mCtx.strokeStyle = isFailed ? "#f00" : "#0f0"; 
+    mCtx.stroke();
+  }
+  mCtx.restore();
+});
+
+function checkAnswer() {
+  let isCorrect = false;
+
+  // [수정됨] 레벨 상관없이 모든 단계에서 '모양(선의 집합)'이 같으면 통과!
+  if (userPattern.length === missionPattern.length) {
+    const getEdges = (pattern) => {
+      const edges = [];
+      for (let i = 0; i < pattern.length - 1; i++) {
+        const a = pattern[i];
+        const b = pattern[i+1];
+        // 번호가 작은 점을 항상 앞에 두어 선의 그리기 방향성을 제거 (예: 1->0 도 '0-1', 0->1도 '0-1')
+        edges.push(a < b ? `${a}-${b}` : `${b}-${a}`);
+      }
+      // 추출된 모든 선을 정렬해서 하나의 문자열로 만들어 비교
+      return edges.sort().join('|'); 
+    };
+    isCorrect = getEdges(userPattern) === getEdges(missionPattern);
+  }
+  
+  if (isCorrect) {
+    statusTxt.innerText = "LEVEL CLEAR!!";
+    statusTxt.style.color = "#0f0";
+    
+    setTimeout(() => {
+      userPattern = [];
+      currentLevel++; // 다음 레벨로 넘어감
+      
+      if (currentLevel > 3) {
+        // 최종 3단계까지 모두 클리어한 경우
+        levelTxt.innerText = "UNLOCKED";
+        statusTxt.innerText = "SYSTEM UNLOCKED. ACCESS GRANTED.";
+        statusTxt.style.color = "#0f0";
+        gCtx.clearRect(0,0,70,70); 
+      } else {
+        updateLevelUI();
+        setupGrid();
+        generateMission();
+        statusTxt.innerText = "READY";
+      }
+    }, 1200);
+  } else {
+    isFailed = true; 
+    statusTxt.innerText = "FAIL! WRONG SEQUENCE";
+    statusTxt.style.color = "red";
+    
+    setTimeout(() => { 
+      userPattern = []; 
+      isFailed = false; 
+      statusTxt.innerText = "READY"; 
+      statusTxt.style.color = "#0f0"; 
+      generateMission(); 
+    }, 1500);
+  }
+}
+
+const camera = new Camera(video, { onFrame: async () => { await hands.send({ image: video }); }, width: 640, height: 480 });
+camera.start().then(() => {
+  setTimeout(init, 500);
+});
+
+// 화면 리사이즈 시 그리드 재배치
+window.addEventListener('resize', init);
   </script>
 </body>
 </html>
