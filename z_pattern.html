@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Lock - Pattern (Retro UI)</title>
+  <style>
+    /* 구글 폰트 임포트 */
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+    :root { 
+      --accent: #0f0; 
+      --bg-side: #0033ff; 
+      --bg-center: #000;
+    }
+    
+    body { 
+      margin: 0; 
+      height: 100vh; 
+      display: flex; 
+      font-family: 'Share Tech Mono', monospace; 
+      overflow: hidden; 
+      background: var(--bg-side);
+      color: white;
+    }
+    
+    #left-pane, #right-pane {
+      flex: 1; 
+      position: relative;
+    }
+
+    /* ===========================
+       [좌측 프레임 UI 디자인] 
+       =========================== */
+    .phone-icon {
+      position: absolute;
+      top: 50px; left: 50px;
+      width: 60px; height: 120px;
+      background: #f0f0f0;
+      border: 6px solid #222;
+      border-radius: 12px;
+      transform: rotate(-15deg);
+      box-shadow: -15px 15px 0px rgba(0,0,0,0.2);
+    }
+    .phone-icon::before {
+      content: '';
+      position: absolute;
+      top: 10px; left: 4px; right: 4px; bottom: 10px;
+      background: #fff;
+      border-radius: 4px;
+    }
+    .phone-icon::after {
+      content: '';
+      position: absolute;
+      top: -2px; left: 50%; transform: translateX(-50%);
+      width: 20px; height: 5px; background: #222;
+      border-bottom-left-radius: 4px; border-bottom-right-radius: 4px;
+    }
+
+    .left-info {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      left: 50px;
+      font-size: 18px;
+      font-style: italic;
+      line-height: 1.6;
+      letter-spacing: 1px;
+    }
+
+    .brand-logo {
+      position: absolute;
+      bottom: 40px;
+      font-family: sans-serif;
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    .left-logo { left: 50px; }
+    .right-logo { right: 50px; }
+
+    /* ===========================
+       [우측 프레임 UI 디자인] 
+       =========================== */
+    .chain-bg {
+      position: absolute;
+      top: -20px; right: -80px;
+      width: 100%; height: 30px;
+      background-image: url("chain_white.svg");
+      transform: rotate(20deg);
+    }
+
+    /* ===========================
+       [가운데 프레임 UI 디자인] 
+       =========================== */
+    #center-pane {
+      flex: 1.4; 
+      padding: 40px 0; 
+      box-sizing: border-box;
+      display: flex;
+    }
+
+    .center-wrapper {
+      flex: 1;
+      background: var(--bg-center);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden; /* ★ 추가: 모서리 밖으로 빠져나가는 요소 차단 */
+    }
+
+    /* 상단 상태바 */
+    #header { 
+      background: #000; 
+      display: flex; 
+      flex-direction: row; 
+      align-items: flex-start; /* 상단 정렬로 변경 */
+      justify-content: space-between; 
+      padding: 15px 20px;
+      border-bottom: 2px solid #222;
+      z-index: 10; 
+    }
+
+    .header-level { 
+      font-size: 20px; 
+      width: 100px; 
+    }
+    
+    /* 미션 타이틀과 캔버스를 묶는 중앙 래퍼 */
+    .header-center { 
+      flex-grow: 1; 
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px; /* 글자와 캔버스 사이 간격 */
+    }
+    .header-title { font-size: 22px; }
+
+    /* 우측 프로그레스 바 (3단계) */
+    .header-progress-wrap { 
+      width: 100px; 
+      display: flex; 
+      justify-content: flex-end; 
+      align-items: center;
+      padding-top: 5px; /* 타이틀과 높이 맞추기 */
+    }
+    .progress-bar {
+      display: flex;
+      align-items: center;
+    }
+    .p-dot {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      box-sizing: border-box;
+    }
+    .p-dot.active { background: #fff; }
+    .p-line {
+      width: 15px; height: 2px;
+      background: #fff;
+    }
+
+    #viewport { 
+      flex: 1; 
+      position: relative; 
+      width: 100%; 
+      height: 100%;
+    }
+    #main-canvas { 
+      width: 100%; 
+      height: 100%; 
+      display: block;
+    }
+    
+    /* Footer 바깥으로 튀어나가는 현상 수정 */
+    #footer { 
+      background: rgba(0, 0, 0, 0.8); 
+      padding: 15px;
+      text-align: center;
+      color: var(--accent); 
+      font-size: 16px; 
+      font-weight: bold;
+      z-index: 10; 
+      position: absolute;
+      bottom: 0; left: 0;
+      width: 100%;
+      box-sizing: border-box; /* ★ 핵심: padding을 width에 포함시켜 오버플로우 방지 */
+    }
+    
+    video { display: none; }
+  </style>
+</head>
+<body>
+
+  <div id="left-pane">
+    <div class="phone-icon"></div>
+    <div class="left-info">
+      Welcome to the<br>
+      Unlocking web<br>
+      Can you try to<br>
+      unlock this phone?<br>
+      THis phone is<br>
+      LLITERRYLLY<br>
+      LOCKED!
+    </div>
+    <div class="brand-logo left-logo">UNLOCK</div>
+  </div>
+  
+  <div id="center-pane">
+    <div class="center-wrapper">
+      <div id="header">
+        <div class="header-level">Level 1</div>
+        
+        <div class="header-center">
+          <div class="header-title">Mission pattern</div>
+          <canvas id="mission-canvas" width="70" height="70"></canvas>
+        </div>
+
+        <div class="header-progress-wrap">
+          <div class="progress-bar">
+            <div class="p-dot active"></div>
+            <div class="p-line"></div>
+            <div class="p-dot"></div>
+            <div class="p-line"></div>
+            <div class="p-dot"></div>
+          </div>
+        </div>
+      </div>
+      
+      <div id="viewport">
+        <canvas id="main-canvas"></canvas>
+        <div id="footer">STATUS: <span id="status-txt">READY</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="right-pane">
+    <div class="chain-bg"></div>
+    <div class="brand-logo right-logo">UNLOCK</div>
+  </div>
+
+  <video id="video" playsinline></video>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+  <script>
+    const mCanvas = document.getElementById('main-canvas');
+    const mCtx = mCanvas.getContext('2d');
+    const gCanvas = document.getElementById('mission-canvas');
+    const gCtx = gCanvas.getContext('2d');
+    const video = document.getElementById('video');
+    const statusTxt = document.getElementById('status-txt');
+
+    let points = [];
+    let missionPattern = [];
+    let userPattern = [];
+    const threshold = 45;
+
+    let submitTimer = null; 
+    let isFailed = false; 
+
+    function init() {
+      mCanvas.width = mCanvas.clientWidth;
+      mCanvas.height = mCanvas.clientHeight;
+      points = [];
+      const gridSize = mCanvas.width * 0.65;
+      const startX = (mCanvas.width - gridSize) / 2;
+      const startY = (mCanvas.height - gridSize) / 2;
+      const step = gridSize / 2;
+
+      for(let i=0; i<3; i++) {
+        for(let j=0; j<3; j++) {
+          points.push({ x: startX + j * step, y: startY + i * step });
+        }
+      }
+      generateMission();
+    }
+
+    function generateMission() {
+      const length = Math.floor(Math.random() * 6) + 4; 
+      const indices = [0,1,2,3,4,5,6,7,8];
+      missionPattern = indices.sort(() => Math.random() - 0.5).slice(0, length);
+      userPattern = [];
+      drawMission();
+    }
+
+    function drawMission() {
+      gCtx.clearRect(0,0,70,70);
+      gCtx.beginPath(); 
+      gCtx.strokeStyle = "#ffffff"; 
+      gCtx.lineWidth = 3; // 선을 조금 더 잘 보이게 두께 수정
+      gCtx.lineJoin = "round";
+      gCtx.lineCap = "round";
+      
+      missionPattern.forEach((idx, i) => {
+        const x = (idx % 3) * 20 + 15;
+        const y = Math.floor(idx / 3) * 20 + 15;
+        
+        // ★ 수정됨: 점(Circle) 그리는 로직 삭제. 오직 선(Line)만 그림!
+        if(i === 0) gCtx.moveTo(x, y); 
+        else gCtx.lineTo(x, y);
+      });
+      gCtx.stroke();
+    }
+
+    const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+
+    hands.onResults((results) => {
+      if (!results.image) return;
+      const vW = results.image.width; const vH = results.image.height;
+      const cW = mCanvas.width; const cH = mCanvas.height;
+      const vRatio = vW / vH; const cRatio = cW / cH;
+      let sW, sH, sx, sy;
+      if (vRatio > cRatio) { sH = vH; sW = vH * cRatio; sx = (vW - sW) / 2; sy = 0; }
+      else { sW = vW; sH = vW / cRatio; sx = 0; sy = (vH - sH) / 2; }
+      
+      mCtx.save();
+      mCtx.clearRect(0, 0, cW, cH);
+      mCtx.translate(cW, 0); mCtx.scale(-1, 1);
+      mCtx.drawImage(results.image, sx, sy, sW, sH, 0, 0, cW, cH);
+
+      // 3x3 점 시각화 (오답이면 빨간색, 아니면 초록색)
+      points.forEach((p, i) => {
+        const visited = userPattern.includes(i);
+        mCtx.beginPath(); mCtx.arc(p.x, p.y, visited ? 12 : 8, 0, Math.PI*2);
+        mCtx.fillStyle = visited ? (isFailed ? "#f00" : "#0f0") : "rgba(255,255,255,0.25)";
+        mCtx.fill();
+      });
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+        const tip = landmarks[8]; // 검지 끝
+        const realX = ((tip.x * vW) - sx) * (cW / sW);
+        const realY = ((tip.y * vH) - sy) * (cH / sH);
+
+        // 오답(FAIL) 상태가 아닐 때만 패턴 입력받기
+        if (!isFailed) {
+          let touchedNewDot = false;
+          points.forEach((p, i) => {
+            const d = Math.hypot(p.x - realX, p.y - realY);
+            if (d < threshold && !userPattern.includes(i)) {
+              userPattern.push(i);
+              touchedNewDot = true;
+            }
+          });
+
+          if (touchedNewDot) {
+            statusTxt.innerText = "DRAWING... (WAIT 3S)";
+            statusTxt.style.color = "#0f0";
+
+            if (submitTimer) clearTimeout(submitTimer);
+            submitTimer = setTimeout(() => {
+              checkAnswer();
+            }, 3000);
+          }
+        }
+
+        // 패턴 선 그리기
+        if (userPattern.length > 0) {
+          mCtx.beginPath(); 
+          mCtx.strokeStyle = isFailed ? "#f00" : "#0f0"; 
+          mCtx.lineWidth = 4;
+          mCtx.lineJoin = "round"; mCtx.lineCap = "round";
+          
+          mCtx.moveTo(points[userPattern[0]].x, points[userPattern[0]].y);
+          userPattern.forEach(idx => mCtx.lineTo(points[idx].x, points[idx].y));
+          
+          if (!isFailed) mCtx.lineTo(realX, realY); 
+          mCtx.stroke();
+        }
+
+        // 손가락 마커
+        mCtx.beginPath();
+        mCtx.arc(realX, realY, 8, 0, Math.PI * 2);
+        mCtx.fillStyle = "#fff"; 
+        mCtx.fill();
+        mCtx.lineWidth = 3;
+        mCtx.strokeStyle = isFailed ? "#f00" : "#0f0"; 
+        mCtx.stroke();
+      }
+      mCtx.restore();
+    });
+
+    function checkAnswer() {
+      const isCorrect = userPattern.length === missionPattern.length && 
+                        userPattern.every((v, idx) => v === missionPattern[idx]);
+      
+      if (isCorrect) {
+        statusTxt.innerText = "SUCCESS!!";
+        statusTxt.style.color = "#0f0";
+        setTimeout(() => {
+          userPattern = [];
+          generateMission(); 
+        }, 1000);
+      } else {
+        isFailed = true; 
+        statusTxt.innerText = "FAIL! WRONG SEQUENCE";
+        statusTxt.style.color = "red";
+        
+        setTimeout(() => { 
+          userPattern = []; 
+          isFailed = false; 
+          statusTxt.innerText = "READY"; 
+          statusTxt.style.color = "#0f0"; 
+          generateMission(); 
+        }, 1500);
+      }
+    }
+
+    const camera = new Camera(video, { onFrame: async () => { await hands.send({ image: video }); }, width: 640, height: 480 });
+    camera.start().then(init);
+  </script>
+</body>
+</html>
