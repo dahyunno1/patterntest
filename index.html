@@ -9,7 +9,7 @@
 
     :root { 
       --accent: #0f0; 
-      --bg-side: #0033ff; 
+      --bg-side: #0033DA;
       --bg-center: #000;
     }
     
@@ -78,6 +78,37 @@
     }
     .left-logo { left: 50px; }
     .right-logo { right: 50px; }
+
+    .logo-img {
+      width: 160px;     /* 크기 조절 */
+      height: auto;
+      display: block;
+    }
+
+    .left-back-btn {
+        position: absolute;
+        bottom: 40px;
+        left: 50px;
+
+        background: none;
+        border: 2px solid white;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+
+        font-family: "Geo", sans-serif;
+        font-weight: 400;
+        font-size: 16pt;
+
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none; /* a태그 밑줄 제거 */
+    }
+
+    .left-back-btn:hover {
+      background-color: white;
+      color: #0033DA;
+    }
 
     /* ===========================
        [우측 프레임 UI 디자인] 
@@ -202,7 +233,7 @@
       LLITERRYLLY<br>
       LOCKED!
     </div>
-    <div class="brand-logo left-logo">UNLOCK</div>
+    <a href="index.html" class="left-back-btn">← BACK</a>
   </div>
   
   <div id="center-pane">
@@ -235,7 +266,9 @@
 
   <div id="right-pane">
     <div class="chain-bg"></div>
-    <div class="brand-logo right-logo">UNLOCK</div>
+    <div class="brand-logo right-logo">
+        <img src="logo_white.svg" class="logo-img">
+    </div>
   </div>
 
   <video id="video" playsinline></video>
@@ -284,25 +317,25 @@ function updateLevelUI() {
 
 // 레벨에 맞춰 N x N 점선 배열 및 인식 범위 셋팅
 function setupGrid() {
-  points = [];
-  if (currentLevel === 1) gridSizeN = 2;
-  else if (currentLevel === 2) gridSizeN = 3;
-  else if (currentLevel === 3) gridSizeN = 4;
+      points = [];
+      if (currentLevel === 1) gridSizeN = 2;
+      else if (currentLevel === 2) gridSizeN = 3;
+      else if (currentLevel === 3) gridSizeN = 4;
 
-  const gridSize = mCanvas.width * 0.65;
-  const startX = (mCanvas.width - gridSize) / 2;
-  const startY = (mCanvas.height - gridSize) / 2;
-  const step = gridSize / (gridSizeN - 1);
+      const gridSize = mCanvas.width * 0.65;
+      const startX = (mCanvas.width - gridSize) / 2;
+      const startY = (mCanvas.height - gridSize) / 2;
+      const step = gridSize / (gridSizeN - 1);
 
-  // 점이 촘촘해지면 터치 인식 반경도 줄여서 오터치 방지
-  threshold = Math.min(45, step * 0.4); 
+      threshold = Math.min(45, step * 0.4); 
 
-  for(let i=0; i<gridSizeN; i++) {
-    for(let j=0; j<gridSizeN; j++) {
-      points.push({ x: startX + j * step, y: startY + i * step });
+      for(let i=0; i<gridSizeN; i++) {
+        for(let j=0; j<gridSizeN; j++) {
+          // 🔴 [수정] 좌우 반전된 캔버스에 맞춰 j의 위치(X좌표)를 역순으로 배치합니다.
+          points.push({ x: startX + (gridSizeN - 1 - j) * step, y: startY + i * step });
+        }
+      }
     }
-  }
-}
 
 // 레벨에 따른 난이도로 미션 생성
 function generateMission() {
@@ -431,17 +464,15 @@ hands.onResults((results) => {
 function checkAnswer() {
   let isCorrect = false;
 
-  // [수정됨] 레벨 상관없이 모든 단계에서 '모양(선의 집합)'이 같으면 통과!
+  // 레벨 상관없이 모든 단계에서 '모양(선의 집합)'이 같으면 통과!
   if (userPattern.length === missionPattern.length) {
     const getEdges = (pattern) => {
       const edges = [];
       for (let i = 0; i < pattern.length - 1; i++) {
         const a = pattern[i];
         const b = pattern[i+1];
-        // 번호가 작은 점을 항상 앞에 두어 선의 그리기 방향성을 제거 (예: 1->0 도 '0-1', 0->1도 '0-1')
         edges.push(a < b ? `${a}-${b}` : `${b}-${a}`);
       }
-      // 추출된 모든 선을 정렬해서 하나의 문자열로 만들어 비교
       return edges.sort().join('|'); 
     };
     isCorrect = getEdges(userPattern) === getEdges(missionPattern);
@@ -456,7 +487,6 @@ function checkAnswer() {
       currentLevel++; // 다음 레벨로 넘어감
       
       if (currentLevel > 3) {
-        // 최종 3단계까지 모두 클리어한 경우
         levelTxt.innerText = "UNLOCKED";
         statusTxt.innerText = "SYSTEM UNLOCKED. ACCESS GRANTED.";
         statusTxt.style.color = "#0f0";
@@ -470,23 +500,32 @@ function checkAnswer() {
     }, 1200);
   } else {
     isFailed = true; 
-    statusTxt.innerText = "FAIL! WRONG SEQUENCE";
+    
+    // 🔴 [수정] 실패 시 1단계로 돌아간다는 경고 메시지로 변경
+    statusTxt.innerText = "FAIL! RESET TO LEVEL 1!";
     statusTxt.style.color = "red";
     
     setTimeout(() => { 
       userPattern = []; 
       isFailed = false; 
+      
+      // 🔴 [수정] 레벨을 1로 초기화하고 UI 및 그리드 새로고침
+      currentLevel = 1;
+      updateLevelUI();
+      setupGrid();
+      
       statusTxt.innerText = "READY"; 
       statusTxt.style.color = "#0f0"; 
       generateMission(); 
-    }, 1500);
+    }, 1500); // 1.5초 뒤에 1단계로 리셋
   }
 }
 
+
 const camera = new Camera(video, { onFrame: async () => { await hands.send({ image: video }); }, width: 640, height: 480 });
-camera.start().then(() => {
-  setTimeout(init, 500);
-});
+    camera.start().then(() => {
+      setTimeout(init, 500);
+    });
 
 // 화면 리사이즈 시 그리드 재배치
 window.addEventListener('resize', init);
